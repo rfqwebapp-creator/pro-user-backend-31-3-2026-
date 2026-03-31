@@ -1,4 +1,5 @@
 const express = require("express");
+const db = require("./config/db");
 const cors = require("cors");
 require("dotenv").config();
 
@@ -9,7 +10,11 @@ app.use(express.json());
 
 const companyRoutes = require("./routes/companyRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const authRoutes = require("./routes/authRoutes")(db);
 
+
+app.use("/api/auth", authRoutes);
+app.use("/api/company", companyRoutes);
 app.use("/api/company", companyRoutes);
 app.use("/api/roles", require("./routes/roleRoutes"));
 app.use("/api/subscriptions", subscriptionRoutes);
