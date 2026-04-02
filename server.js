@@ -1,12 +1,36 @@
+
+require("dotenv").config();
+
 const express = require("express");
 const db = require("./config/db");
 const cors = require("cors");
-require("dotenv").config();
 
 const app = express();
 
-app.use(cors());
+// Configure CORS to allow Vercel frontend
+const allowedOrigins = [
+  "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
+
+app.use(cors({
+  origin: function(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('CORS not allowed'));
+    }
+  },
+  credentials: true
+}));
 app.use(express.json());
+
+// Request logging middleware - helps debug API calls
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+  next();
+});
 
 const companyRoutes = require("./routes/companyRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
@@ -27,7 +51,7 @@ app.get("/", (req, res) => {
   res.send("API Running...");
 });
 
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 
 // app.listen(PORT, () => {
 //   console.log(`🚀 Server running on http://localhost:${PORT}`);
