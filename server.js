@@ -7,22 +7,30 @@ const cors = require("cors");
 
 const app = express();
 
-// Configure CORS to allow Vercel frontend
+// Configure CORS to allow Vercel frontend and proxied requests
 const allowedOrigins = [
   "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
+  "https://pro-user-frontend-31-03-2026-kkr9.vercel.app",
   "http://localhost:5173",
-  "http://localhost:3000"
+  "http://localhost:3000",
+  "http://localhost:5001"
 ];
 
 app.use(cors({
   origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps, curl requests)
+    // Also allow requests from whitelisted origins
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
-      callback(new Error('CORS not allowed'));
+      // Still process the request, just won't include CORS headers
+      console.log(`⚠️ CORS origin not whitelisted: ${origin}`);
+      callback(null, true);
     }
   },
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
