@@ -11,6 +11,8 @@ const app = express();
 const allowedOrigins = [
   "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
   "https://pro-user-frontend-31-03-2026-kkr9.vercel.app",
+  "https://www.procubid.com",
+  "https://procubid.com",
   "http://localhost:5173",
   "http://localhost:3000",
   "http://localhost:5001"
