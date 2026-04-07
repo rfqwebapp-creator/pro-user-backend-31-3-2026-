@@ -12,6 +12,7 @@ app.use(cors({
     "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
     "https://pro-user-frontend-31-03-2026-kkr9.vercel.app",
     "https://www.procubid.com",
+    "https://api.procubid.com",
     "https://procubid.com",
     "http://localhost:5173"
   ],
