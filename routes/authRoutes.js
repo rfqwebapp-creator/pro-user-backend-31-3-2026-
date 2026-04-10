@@ -1,15 +1,18 @@
 const express = require("express");
-const router = express.Router();
 const bcrypt = require("bcrypt");
 
 module.exports = (db) => {
+  const router = express.Router();
+
+  router.get("/test", (req, res) => {
+    res.json({ message: "Auth route working" });
+  });
 
   // ================= REGISTER =================
   router.post("/register", async (req, res) => {
-     // 🔍 DEBUG START
-  console.log("🔎 Headers:", req.headers);
-  console.log("📦 Raw Body:", req.body);
-  // 🔍 DEBUG END
+    console.log("🔎 Headers:", req.headers);
+    console.log("📦 Raw Body:", req.body);
+
     try {
       const {
         country,
