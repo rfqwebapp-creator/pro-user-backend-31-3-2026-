@@ -37,7 +37,21 @@ app.use(cors({
 app.options("*", cors());
 
 // Parse JSON
-app.use(express.json());
+app.use(express.json({
+  verify: (req, res, buf) => {
+    req.rawBody = buf.toString();
+  }
+}));
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    console.error("❌ Invalid JSON raw body:", req.rawBody);
+    return res.status(400).json({
+      message: "Invalid JSON body",
+      rawBody: req.rawBody
+    });
+  }
+  next(err);
+});
 app.use(express.urlencoded({ extended: true }));
 
 // Request logging
