@@ -100,6 +100,10 @@ module.exports = (db) => {
       });
     }
   });
+  router.get("/register", (req, res) => {
+  console.log("⚠️ GET REGISTER HIT");
+  res.status(405).json({ message: "Use POST only" });
+});
 
   // ================= LOGIN =================
   router.post("/login", (req, res) => {
