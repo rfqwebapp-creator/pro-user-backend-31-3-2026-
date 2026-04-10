@@ -5,59 +5,97 @@ const bcrypt = require("bcrypt");
 module.exports = (db) => {
 
   // ================= REGISTER =================
-  router.post("/register", (req, res) => {
-    const {
-      country,
-      email,
-      password,
-      firstName,
-      lastName,
-      phone,
-      industry,
-      workNumber,
-      gst,
-      companyName,
-      referralCode,
-    } = req.body;
+  router.post("/register", async (req, res) => {
+     // 🔍 DEBUG START
+  console.log("🔎 Headers:", req.headers);
+  console.log("📦 Raw Body:", req.body);
+  // 🔍 DEBUG END
+    try {
+      const {
+        country,
+        email,
+        password,
+        firstName,
+        lastName,
+        phone,
+        industry,
+        workNumber,
+        gst,
+        companyName,
+        referralCode,
+      } = req.body;
 
-    const checkSql = "SELECT * FROM RegCustomers WHERE email = ?";
-    db.query(checkSql, [email], (err, result) => {
-      if (err) return res.status(500).send("DB Error ❌");
-
-      if (result.length > 0) {
-        return res.status(400).send("Email already registered ❌");
+      if (!email || !password || !firstName || !lastName) {
+        return res.status(400).json({
+          message: "Required fields are missing",
+        });
       }
 
-      bcrypt.hash(password, 10, (err, hash) => {
-        if (err) return res.status(500).send("Hash error ❌");
+      const checkSql = "SELECT * FROM RegCustomers WHERE email = ?";
 
-        const insertSql = `
-          INSERT INTO RegCustomers 
-          (country, email, password, firstName, lastName, phone, industry, workNumber, gst, companyName, referralCode)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
+      db.query(checkSql, [email], async (err, result) => {
+        if (err) {
+          console.error("DB check error:", err);
+          return res.status(500).json({
+            message: "Database error",
+          });
+        }
 
-        const values = [
-          country,
-          email,
-          hash,
-          firstName,
-          lastName,
-          phone,
-          industry,
-          workNumber,
-          gst,
-          companyName,
-          referralCode,
-        ];
+        if (result.length > 0) {
+          return res.status(400).json({
+            message: "Email already registered",
+          });
+        }
 
-        db.query(insertSql, values, (err) => {
-          if (err) return res.status(500).send("Insert failed ❌");
+        try {
+          const hash = await bcrypt.hash(password, 10);
 
-          res.send("User registered successfully ✅");
-        });
+          const insertSql = `
+            INSERT INTO RegCustomers
+            (country, email, password, firstName, lastName, phone, industry, workNumber, gst, companyName, referralCode)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `;
+
+          const values = [
+            country || "",
+            email,
+            hash,
+            firstName || "",
+            lastName || "",
+            phone || "",
+            industry || "",
+            workNumber || "",
+            gst || "",
+            companyName || "",
+            referralCode || "",
+          ];
+
+          db.query(insertSql, values, (err, insertResult) => {
+            if (err) {
+              console.error("Insert error:", err);
+              return res.status(500).json({
+                message: "Insert failed",
+              });
+            }
+
+            return res.status(201).json({
+              message: "User registered successfully",
+              userId: insertResult.insertId,
+            });
+          });
+        } catch (hashError) {
+          console.error("Hash error:", hashError);
+          return res.status(500).json({
+            message: "Password hash failed",
+          });
+        }
       });
-    });
+    } catch (error) {
+      console.error("Register route error:", error);
+      return res.status(500).json({
+        message: "Server error",
+      });
+    }
   });
 
   // ================= LOGIN =================

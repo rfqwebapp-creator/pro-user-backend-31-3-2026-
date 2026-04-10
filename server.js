@@ -1,73 +1,176 @@
 require("dotenv").config();
 
 const express = require("express");
-const db = require("./config/db");
 const cors = require("cors");
+const db = require("./config/db");
 
 const app = express();
 
-// ✅ CORS CONFIG (FINAL WORKING)
+const allowedOrigins = [
+  "https://www.procubid.com",
+  "https://procubid.com",
+  "http://localhost:5173",
+  "http://localhost:3000"
+];
+
+// Allow Vercel preview + production domains safely
 app.use(cors({
-  origin: [
-    "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
-    "https://pro-user-frontend-31-03-2026-kkr9.vercel.app",
-    "https://www.procubid.com",
-    "https://api.procubid.com",
-    "https://procubid.com",
-    "http://localhost:5173"
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  origin: function (origin, callback) {
+    // allow requests without origin (Postman, curl, server-to-server)
+    if (!origin) return callback(null, true);
+
+    if (
+      allowedOrigins.includes(origin) ||
+      origin.endsWith(".vercel.app")
+    ) {
+      return callback(null, true);
+    }
+
+    console.log("❌ CORS blocked origin:", origin);
+    return callback(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"],
   allowedHeaders: ["Content-Type", "Authorization"],
   credentials: true
 }));
 
-// ✅ Handle preflight manually (SAFE)
-app.use((req, res, next) => {
-  if (req.method === "OPTIONS") {
-    res.header("Access-Control-Allow-Origin", req.headers.origin);
-    res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    return res.sendStatus(200);
-  }
-  next();
-});
+app.options("*", cors());
 
-// ✅ Middleware
+// Parse JSON
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// ✅ Request logging (debug)
+// Request logging
 app.use((req, res, next) => {
   console.log(`📨 ${req.method} ${req.path} - ${new Date().toISOString()}`);
   next();
 });
 
-// ✅ Routes
-const companyRoutes = require("./routes/companyRoutes");
-const subscriptionRoutes = require("./routes/subscriptionRoutes");
-const authRoutes = require("./routes/authRoutes")(db);
+// Health routes
+app.get("/", (req, res) => {
+  res.send("API Running...");
+});
 
-app.use("/api/auth", authRoutes);
-app.use("/api/company", companyRoutes); // ✅ removed duplicate
-app.use("/api/roles", require("./routes/roleRoutes"));
-app.use("/api/subscriptions", subscriptionRoutes);
+app.get("/api", (req, res) => {
+  res.status(200).json({ message: "API running" });
+});
 
-// ✅ Temporary user middleware
+app.head("/api", (req, res) => {
+  res.sendStatus(200);
+});
+
+// Temporary user middleware
 app.use((req, res, next) => {
   req.user = { id: 1 };
   next();
 });
 
-// ✅ Root route
-app.get("/", (req, res) => {
-  res.send("API Running...");
+// Routes
+const companyRoutes = require("./routes/companyRoutes");
+const subscriptionRoutes = require("./routes/subscriptionRoutes");
+const authRoutes = require("./routes/authRoutes")(db);
+
+app.use("/api/auth", authRoutes);
+app.use("/api/company", companyRoutes);
+app.use("/api/roles", require("./routes/roleRoutes"));
+app.use("/api/subscriptions", subscriptionRoutes);
+
+// Handle invalid JSON body errors
+app.use((err, req, res, next) => {
+  if (err instanceof SyntaxError && err.status === 400 && "body" in err) {
+    console.error("❌ Invalid JSON received:", err.message);
+    return res.status(400).json({
+      success: false,
+      message: "Invalid JSON format in request body"
+    });
+  }
+  next(err);
 });
 
-// ✅ Start server
+// Generic error handler
+app.use((err, req, res, next) => {
+  console.error("❌ Server error:", err);
+  res.status(500).json({
+    success: false,
+    message: "Internal server error"
+  });
+});
+
 const PORT = process.env.PORT || 5001;
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
 });
+// require("dotenv").config();
+
+// const express = require("express");
+// const db = require("./config/db");
+// const cors = require("cors");
+
+// const app = express();
+
+// // ✅ CORS CONFIG (FINAL WORKING)
+// app.use(cors({
+//   origin: [
+//     "https://pro-user-frontend-31-03-2026-crgu.vercel.app",
+//     "https://pro-user-frontend-31-03-2026-kkr9.vercel.app",
+//     "https://www.procubid.com",
+//     "https://api.procubid.com",
+//     "https://procubid.com",
+//     "http://localhost:5173"
+//   ],
+//   methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+//   allowedHeaders: ["Content-Type", "Authorization"],
+//   credentials: true
+// }));
+
+// // ✅ Handle preflight manually (SAFE)
+// app.use((req, res, next) => {
+//   if (req.method === "OPTIONS") {
+//     res.header("Access-Control-Allow-Origin", req.headers.origin);
+//     res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+//     res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+//     return res.sendStatus(200);
+//   }
+//   next();
+// });
+
+// // ✅ Middleware
+// app.use(express.json());
+
+// // ✅ Request logging (debug)
+// app.use((req, res, next) => {
+//   console.log(`📨 ${req.method} ${req.path} - ${new Date().toISOString()}`);
+//   next();
+// });
+
+// // ✅ Routes
+// const companyRoutes = require("./routes/companyRoutes");
+// const subscriptionRoutes = require("./routes/subscriptionRoutes");
+// const authRoutes = require("./routes/authRoutes")(db);
+
+// app.use("/api/auth", authRoutes);
+// app.use("/api/company", companyRoutes); // ✅ removed duplicate
+// app.use("/api/roles", require("./routes/roleRoutes"));
+// app.use("/api/subscriptions", subscriptionRoutes);
+
+// // ✅ Temporary user middleware
+// app.use((req, res, next) => {
+//   req.user = { id: 1 };
+//   next();
+// });
+
+// // ✅ Root route
+// app.get("/", (req, res) => {
+//   res.send("API Running...");
+// });
+
+// // ✅ Start server
+// const PORT = process.env.PORT || 5001;
+
+// app.listen(PORT, "0.0.0.0", () => {
+//   console.log(`🚀 Server running on port ${PORT}`);
+// });
 
 
 
