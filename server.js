@@ -3,7 +3,7 @@ require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
 const db = require("./config/db");
-
+const path = require("path");
 const app = express();
 
 const allowedOrigins = [
@@ -83,6 +83,12 @@ app.use((req, res, next) => {
 const companyRoutes = require("./routes/companyRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const authRoutes = require("./routes/authRoutes")(db);
+
+
+const companyInfoRoutes = require("./routes/companyInfoRoutes");
+app.use("/api/company-info", companyInfoRoutes);
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
 
 app.use("/api/auth", authRoutes);
 app.use("/api/company", companyRoutes);
