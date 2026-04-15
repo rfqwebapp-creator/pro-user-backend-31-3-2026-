@@ -85,8 +85,8 @@ const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const authRoutes = require("./routes/authRoutes")(db);
 
 
-const companyInfoRoutes = require("./routes/companyInfoRoutes");
-app.use("/api/company-info", companyInfoRoutes);
+// const companyInfoRoutes = require("./routes/companyInfoRoutes");
+// app.use("/api/company-info", companyInfoRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 

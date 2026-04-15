@@ -1,28 +1,59 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../config/db");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const db = require("../config/db");
 
-// ✅ CREATE uploads FOLDER IF NOT EXISTS
-if (!fs.existsSync("uploads")) {
-  fs.mkdirSync("uploads");
-}
+// create upload folders
+const uploadBaseDir = path.join(__dirname, "../uploads");
+const logoDir = path.join(uploadBaseDir, "logos");
+const coverDir = path.join(uploadBaseDir, "covers");
 
-// ✅ MULTER STORAGE CONFIG
+if (!fs.existsSync(uploadBaseDir)) fs.mkdirSync(uploadBaseDir);
+if (!fs.existsSync(logoDir)) fs.mkdirSync(logoDir, { recursive: true });
+if (!fs.existsSync(coverDir)) fs.mkdirSync(coverDir, { recursive: true });
+
+// multer storage
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/");
+  destination: function (req, file, cb) {
+    if (file.fieldname === "logo") {
+      cb(null, logoDir);
+    } else if (file.fieldname === "cover") {
+      cb(null, coverDir);
+    } else {
+      cb(null, uploadBaseDir);
+    }
   },
-  filename: (req, file, cb) => {
-    cb(null, Date.now() + path.extname(file.originalname));
+  filename: function (req, file, cb) {
+    const uniqueName =
+      Date.now() +
+      "-" +
+      Math.round(Math.random() * 1e9) +
+      path.extname(file.originalname);
+    cb(null, uniqueName);
   },
 });
 
-const upload = multer({ storage });
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|webp/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  const mimetype = file.mimetype.startsWith("image/");
 
-// ✅ CREATE COMPANY
+  if (extname && mimetype) {
+    cb(null, true);
+  } else {
+    cb(new Error("Only image files are allowed"));
+  }
+};
+
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// SAVE COMPANY PROFILE
 router.post(
   "/",
   upload.fields([
@@ -31,8 +62,9 @@ router.post(
   ]),
   (req, res) => {
     try {
-      console.log("📦 BODY:", req.body);
-      console.log("📁 FILES:", req.files);
+      console.log("POST /api/company hit");
+      console.log("BODY:", req.body);
+      console.log("FILES:", req.files);
 
       const {
         legalName,
@@ -49,216 +81,111 @@ router.post(
         procurementCount,
         about,
         socials,
-        ndaRequired,
-        vendorFormRequired,
       } = req.body;
 
-      // ✅ SAFE PARSE SOCIALS
+      const logo = req.files?.logo?.[0]?.filename || null;
+      const cover = req.files?.cover?.[0]?.filename || null;
+
+      let parsedIndustry = [];
       let parsedSocials = {};
+
       try {
-        parsedSocials =
-          typeof socials === "string"
-            ? JSON.parse(socials)
-            : socials || {};
+        parsedIndustry = industry ? JSON.parse(industry) : [];
+      } catch (e) {
+        parsedIndustry = [];
+      }
+
+      try {
+        parsedSocials = socials ? JSON.parse(socials) : {};
       } catch (e) {
         parsedSocials = {};
       }
 
-      // ✅ SAFE INDUSTRY
-      const industryData =
-        typeof industry === "string"
-          ? industry
-          : JSON.stringify(industry);
-
-      // ✅ BOOLEAN FIX
-      const nda =
-        ndaRequired === "true" || ndaRequired === "on" ? 1 : 0;
-
-      const vendor =
-        vendorFormRequired === "true" || vendorFormRequired === "on"
-          ? 1
-          : 0;
-
-      // ✅ FILES
-      const logo = req.files?.logo?.[0]?.filename || null;
-      const cover = req.files?.cover?.[0]?.filename || null;
-
-      // ✅ SQL QUERY
       const sql = `
-        INSERT INTO company_profile 
-        (legal_name, address, country, phone, email, type, size, industry, reg_number, vat, inc_date, procurement_count, about, linkedin, twitter, facebook, instagram, youtube, nda_required, vendor_form_required, logo, cover_image)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      db.query(
-        sql,
-        [
-          legalName,
+        INSERT INTO company_profiles (
+          legal_name,
           address,
           country,
           phone,
           email,
-          type,
-          size,
-          industryData,
-          regNumber,
+          company_type,
+          company_size,
+          industry,
+          reg_number,
           vat,
-          incDate || null,
-          procurementCount,
+          inc_date,
+          procurement_count,
           about,
-          parsedSocials.linkedin || null,
-          parsedSocials.twitter || null,
-          parsedSocials.facebook || null,
-          parsedSocials.instagram || null,
-          parsedSocials.youtube || null,
-          nda,
-          vendor,
+          socials,
           logo,
-          cover,
-        ],
-        (err, result) => {
-          if (err) {
-            console.error("❌ DB ERROR:", err);
-            return res.status(500).json({ error: err.message });
-          }
-
-          res.json({
-            message: "✅ Company created successfully",
-            id: result.insertId,
-          });
-        }
-      );
-    } catch (error) {
-      console.error("❌ SERVER ERROR:", error);
-      res.status(500).json({ error: error.message });
-    }
-  }
-);
-
-// ✅ GET COMPANY BY ID
-router.get("/:id", (req, res) => {
-  const id = req.params.id;
-
-  db.query(
-    "SELECT * FROM company_profile WHERE id = ?",
-    [id],
-    (err, result) => {
-      if (err) {
-        console.error("❌ DB ERROR:", err);
-        return res.status(500).json({ error: err.message });
-      }
-
-      res.json(result[0]);
-    }
-  );
-});
-
-// ✅ UPDATE COMPANY
-router.put(
-  "/:id",
-  upload.fields([
-    { name: "logo", maxCount: 1 },
-    { name: "cover", maxCount: 1 },
-  ]),
-  (req, res) => {
-    const id = req.params.id;
-
-    try {
-      const {
-        legalName,
-        address,
-        country,
-        phone,
-        email,
-        type,
-        size,
-        industry,
-        regNumber,
-        vat,
-        incDate,
-        procurementCount,
-        about,
-        socials,
-        ndaRequired,
-        vendorFormRequired,
-      } = req.body;
-
-      let parsedSocials = {};
-      try {
-        parsedSocials =
-          typeof socials === "string"
-            ? JSON.parse(socials)
-            : socials || {};
-      } catch {
-        parsedSocials = {};
-      }
-
-      const industryData =
-        typeof industry === "string"
-          ? industry
-          : JSON.stringify(industry);
-
-      const nda =
-        ndaRequired === "true" || ndaRequired === "on" ? 1 : 0;
-
-      const vendor =
-        vendorFormRequired === "true" || vendorFormRequired === "on"
-          ? 1
-          : 0;
-
-      const logo = req.files?.logo?.[0]?.filename;
-      const cover = req.files?.cover?.[0]?.filename;
-
-      const sql = `
-        UPDATE company_profile SET
-        legal_name=?, address=?, country=?, phone=?, email=?, type=?, size=?, industry=?, reg_number=?, vat=?, inc_date=?, procurement_count=?, about=?, linkedin=?, twitter=?, facebook=?, instagram=?, youtube=?, nda_required=?, vendor_form_required=?,
-        ${logo ? "logo=?," : ""}
-        ${cover ? "cover_image=?," : ""}
-        updated_at = NOW()
-        WHERE id=?
+          cover
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `;
 
       const values = [
-        legalName,
-        address,
-        country,
-        phone,
-        email,
-        type,
-        size,
-        industryData,
-        regNumber,
-        vat,
+        legalName || null,
+        address || null,
+        country || null,
+        phone || null,
+        email || null,
+        type || null,
+        size || null,
+        JSON.stringify(parsedIndustry),
+        regNumber || null,
+        vat || null,
         incDate || null,
-        procurementCount,
-        about,
-        parsedSocials.linkedin || null,
-        parsedSocials.twitter || null,
-        parsedSocials.facebook || null,
-        parsedSocials.instagram || null,
-        parsedSocials.youtube || null,
-        nda,
-        vendor,
+        procurementCount || 0,
+        about || null,
+        JSON.stringify(parsedSocials),
+        logo,
+        cover,
       ];
 
-      if (logo) values.push(logo);
-      if (cover) values.push(cover);
-
-      values.push(id);
-
-      db.query(sql, values, (err) => {
+      db.query(sql, values, (err, result) => {
         if (err) {
-          console.error("❌ UPDATE ERROR:", err);
-          return res.status(500).json({ error: err.message });
+          console.error("❌ Insert error:", err);
+          return res.status(500).json({
+            success: false,
+            message: "Database insert failed",
+            error: err.message,
+          });
         }
 
-        res.json({ message: "✅ Company updated successfully" });
+        return res.status(201).json({
+          success: true,
+          message: "Company profile saved successfully",
+          id: result.insertId,
+        });
       });
     } catch (error) {
-      console.error("❌ SERVER ERROR:", error);
-      res.status(500).json({ error: error.message });
+      console.error("❌ Server error:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Server error",
+        error: error.message,
+      });
     }
   }
 );
+
+// GET ALL
+router.get("/", (req, res) => {
+  const sql = "SELECT * FROM company_profiles ORDER BY id DESC";
+
+  db.query(sql, (err, result) => {
+    if (err) {
+      console.error("❌ Fetch error:", err);
+      return res.status(500).json({
+        success: false,
+        error: err.message,
+      });
+    }
+
+    return res.json({
+      success: true,
+      data: result,
+    });
+  });
+});
 
 module.exports = router;
