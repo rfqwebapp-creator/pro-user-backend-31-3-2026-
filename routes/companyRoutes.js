@@ -187,5 +187,11 @@ router.get("/", (req, res) => {
     });
   });
 });
-
+// TEST GET ROUTE
+router.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "Company route working"
+  });
+});
 module.exports = router;
