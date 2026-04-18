@@ -67,8 +67,8 @@ router.post(
       console.log("FILES:", req.files);
 
       const {
-        user_id,
-        legalName,
+  user_id,
+  legalName,
         address,
         country,
         phone,
@@ -83,6 +83,8 @@ router.post(
         about,
         socials,
       } = req.body;
+user_id = parseInt(user_id);
+console.log("FINAL USER_ID:", user_id);
 
       if (!user_id) {
         return res.status(400).json({
