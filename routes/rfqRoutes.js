@@ -6,10 +6,11 @@ const {
   getRFQById,
   updateRFQStatus,
 } = require("../controllers/rfqController");
+const authMiddleware = require("../middleware/authMiddleware");
 
-router.post("/create", createRFQ);
-router.get("/", getRFQs);             
-router.get("/:id", getRFQById);       
-router.put("/:id/status", updateRFQStatus);
+router.post("/create", authMiddleware, createRFQ);
+router.get("/", authMiddleware, getRFQs);
+router.get("/:id", authMiddleware, getRFQById);
+router.put("/:id/status", authMiddleware, updateRFQStatus);
 
 module.exports = router;

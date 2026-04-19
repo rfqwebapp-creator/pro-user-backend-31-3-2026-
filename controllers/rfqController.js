@@ -7,8 +7,9 @@ exports.createRFQ = async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    const userId = req.user.id;
+
     const {
-      user_id,
       heading,
       description,
       procurementType,
@@ -32,7 +33,6 @@ exports.createRFQ = async (req, res) => {
       rfxVisibility,
       status,
     } = req.body;
-
     const finalStatus = status || "DRAFT";
 
     const [rfqResult] = await conn.query(
@@ -58,7 +58,7 @@ exports.createRFQ = async (req, res) => {
         status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        user_id || null,
+        userId,
         heading || "",
         description || "",
         procurementType || "",
@@ -153,19 +153,21 @@ exports.createRFQ = async (req, res) => {
 
 // GET ALL / FILTER BY STATUS
 exports.getRFQs = async (req, res) => {
+  
   try {
+    const userId = req.user.id; 
     const { status } = req.query;
 
     let sql = `
       SELECT id, heading, requisition_type, purpose, status, created_at
-      FROM rfqs
+      FROM rfqs WHERE user_id = ?
     `;
-    let params = [];
+    let params = [userId];
 
     if (status && status !== "ALL") {
-      sql += ` WHERE status = ?`;
-      params.push(status);
-    }
+  sql += ` AND status = ?`;
+  params.push(status);
+}
 
     sql += ` ORDER BY id DESC`;
 
@@ -190,10 +192,12 @@ exports.getRFQById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [rfqRows] = await db.promise().query(
-      `SELECT * FROM rfqs WHERE id = ?`,
-      [id]
-    );
+   const userId = req.user.id;
+
+const [rfqRows] = await db.promise().query(
+  `SELECT * FROM rfqs WHERE id = ? AND user_id = ?`,
+  [id, userId]
+);
 
     if (rfqRows.length === 0) {
       return res.status(404).json({
