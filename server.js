@@ -83,12 +83,14 @@ app.use((req, res, next) => {
 const companyRoutes = require("./routes/companyRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
 const authRoutes = require("./routes/authRoutes")(db);
+const rfqRoutes = require("./routes/rfqRoutes");
 
 
 // const companyInfoRoutes = require("./routes/companyInfoRoutes");
 // app.use("/api/company-info", companyInfoRoutes);
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
+app.use("/api/rfq", rfqRoutes);
 
 app.use("/api/auth", authRoutes);
 app.use("/api/company", companyRoutes);
