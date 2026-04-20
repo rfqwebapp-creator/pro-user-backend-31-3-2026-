@@ -433,6 +433,7 @@ exports.updateRFQ = async (req, res) => {
 // CANCEL RFQ
 exports.cancelRFQ = async (req, res) => {
   try {
+    console.log("✅ CANCEL CONTROLLER HIT");
     const { id } = req.params;
     const userId = req.user.id;
 
@@ -441,9 +442,16 @@ exports.cancelRFQ = async (req, res) => {
       [id, userId]
     );
 
+    if (result.affectedRows === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "RFQ not found",
+      });
+    }
+
     res.json({
       success: true,
-      message: "RFX cancelled successfully",
+      message: "RFQ cancelled successfully",
     });
   } catch (error) {
     console.error("CANCEL RFQ ERROR:", error);
