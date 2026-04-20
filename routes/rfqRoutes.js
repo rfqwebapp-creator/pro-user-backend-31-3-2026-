@@ -12,9 +12,12 @@ const { cancelRFQ } = require("../controllers/rfqController");
 
 router.post("/create", authMiddleware, createRFQ);
 router.get("/", authMiddleware, getRFQs);
+
+// 🔥 MOVE THIS UP
+router.put("/:id/cancel", authMiddleware, cancelRFQ);
+
 router.get("/:id", authMiddleware, getRFQById);
 router.put("/:id/status", authMiddleware, updateRFQStatus);
 router.put("/:id", authMiddleware, updateRFQ);
-router.put("/:id/cancel", authMiddleware, cancelRFQ);
 
 module.exports = router;
