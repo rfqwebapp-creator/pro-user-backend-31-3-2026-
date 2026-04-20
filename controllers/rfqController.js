@@ -289,3 +289,142 @@ exports.updateRFQStatus = async (req, res) => {
     });
   }
 };
+
+
+// UPDATE RFQ
+exports.updateRFQ = async (req, res) => {
+  const conn = await db.promise().getConnection();
+
+  try {
+    await conn.beginTransaction();
+
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const {
+      heading,
+      description,
+      procurementType,
+      requisitionType,
+      bidType,
+      purpose,
+      evaluationMethod,
+      classification,
+      publishDate,
+      closingDate,
+      selectedIndustry,
+      selectedSubItems = [],
+      items = [],
+      itemDescriptionNote,
+      documents = [],
+      deliveryTime,
+      paymentTerms,
+      supplierOption,
+      searchSupplierText,
+      inviteEmails = [],
+      rfxVisibility,
+    } = req.body;
+
+    // 🔹 Update main RFQ
+    await conn.query(
+      `UPDATE rfqs SET
+        heading = ?,
+        description = ?,
+        procurement_type = ?,
+        requisition_type = ?,
+        bid_type = ?,
+        purpose = ?,
+        evaluation_method = ?,
+        classification = ?,
+        publish_date = ?,
+        closing_date = ?,
+        selected_industry = ?,
+        item_description_note = ?,
+        delivery_time = ?,
+        payment_terms = ?,
+        supplier_option = ?,
+        search_supplier_text = ?,
+        rfx_visibility = ?
+      WHERE id = ? AND user_id = ?`,
+      [
+        heading,
+        description,
+        procurementType,
+        requisitionType,
+        bidType,
+        purpose,
+        evaluationMethod,
+        classification,
+        publishDate,
+        closingDate,
+        selectedIndustry,
+        itemDescriptionNote,
+        deliveryTime,
+        paymentTerms,
+        supplierOption,
+        searchSupplierText,
+        rfxVisibility,
+        id,
+        userId,
+      ]
+    );
+
+    // 🔥 OLD DATA DELETE (IMPORTANT)
+    await conn.query(`DELETE FROM rfq_items WHERE rfq_id = ?`, [id]);
+    await conn.query(`DELETE FROM rfq_documents WHERE rfq_id = ?`, [id]);
+    await conn.query(`DELETE FROM rfq_invite_emails WHERE rfq_id = ?`, [id]);
+    await conn.query(`DELETE FROM rfq_sub_items WHERE rfq_id = ?`, [id]);
+
+    // 🔹 INSERT UPDATED ITEMS
+    for (const item of items) {
+      await conn.query(
+        `INSERT INTO rfq_items (rfq_id, sl_no, item_description, quantity, unit)
+         VALUES (?, ?, ?, ?, ?)`,
+        [id, item.slNo, item.itemDescription, item.quantity, item.unit]
+      );
+    }
+
+    // 🔹 DOCUMENTS
+    for (const doc of documents) {
+      await conn.query(
+        `INSERT INTO rfq_documents (rfq_id, name, url)
+         VALUES (?, ?, ?)`,
+        [id, doc.name, doc.url]
+      );
+    }
+
+    // 🔹 EMAILS
+    for (const email of inviteEmails) {
+      await conn.query(
+        `INSERT INTO rfq_invite_emails (rfq_id, email)
+         VALUES (?, ?)`,
+        [id, email]
+      );
+    }
+
+    // 🔹 SUB ITEMS
+    for (const sub of selectedSubItems) {
+      await conn.query(
+        `INSERT INTO rfq_sub_items (rfq_id, sub_item)
+         VALUES (?, ?)`,
+        [id, sub]
+      );
+    }
+
+    await conn.commit();
+
+    res.json({
+      success: true,
+      message: "RFQ updated successfully",
+    });
+  } catch (error) {
+    await conn.rollback();
+    console.error("UPDATE RFQ ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update RFQ",
+    });
+  } finally {
+    conn.release();
+  }
+};
