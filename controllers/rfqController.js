@@ -428,3 +428,28 @@ exports.updateRFQ = async (req, res) => {
     conn.release();
   }
 };
+
+
+// CANCEL RFQ
+exports.cancelRFQ = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+
+    const [result] = await db.promise().query(
+      `UPDATE rfqs SET status = 'CANCELLED' WHERE id = ? AND user_id = ?`,
+      [id, userId]
+    );
+
+    res.json({
+      success: true,
+      message: "RFX cancelled successfully",
+    });
+  } catch (error) {
+    console.error("CANCEL RFQ ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to cancel RFQ",
+    });
+  }
+};
