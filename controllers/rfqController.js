@@ -232,8 +232,8 @@ const [rfqRows] = await db.promise().query(
         ...rfqRows[0],
         items,
         documents,
-        inviteEmails: emails,
-        selectedSubItems: subItems,
+       inviteEmails: emails.map((e) => e.email),
+selectedSubItems: subItems.map((s) => s.sub_item),
       },
     });
   } catch (error) {
