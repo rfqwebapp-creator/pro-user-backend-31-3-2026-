@@ -159,19 +159,34 @@ exports.getRFQs = async (req, res) => {
     const { status } = req.query;
 
     let sql = `
-      SELECT id, heading, requisition_type, purpose, status, created_at
-      FROM rfqs WHERE user_id = ?
+      SELECT 
+        id, 
+        heading, 
+        requisition_type, 
+        purpose, 
+        COALESCE(NULLIF(TRIM(status), ''), NULL) AS status,
+        created_at
+      FROM rfqs 
+      WHERE user_id = ?
     `;
     let params = [userId];
 
     if (status && status !== "ALL") {
-  sql += ` AND status = ?`;
-  params.push(status);
+  sql += ` AND UPPER(TRIM(status)) = ?`;
+  params.push(status.toUpperCase());
 }
 
     sql += ` ORDER BY id DESC`;
 
+    console.log("📋 GETRFQS QUERY:", sql);
+    console.log("📋 GETRFQS PARAMS:", params);
+    
     const [rows] = await db.promise().query(sql, params);
+
+    console.log("📋 GETRFQS RESULT COUNT:", rows.length);
+    rows.forEach((row, i) => {
+      console.log(`📋 Row ${i}: id=${row.id}, status="${row.status}" (type: ${typeof row.status})`);
+    });
 
     res.json({
       success: true,
@@ -437,10 +452,14 @@ exports.cancelRFQ = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
 
+    console.log(`📋 CANCEL RFQ ID: ${id}, USER ID: ${userId}`);
+
     const [result] = await db.promise().query(
       `UPDATE rfqs SET status = 'CANCELLED' WHERE id = ? AND user_id = ?`,
       [id, userId]
     );
+
+    console.log(`📋 CANCEL UPDATE AFFECTED ROWS: ${result.affectedRows}`);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({
@@ -449,9 +468,21 @@ exports.cancelRFQ = async (req, res) => {
       });
     }
 
+    // Verify the update was saved
+    const [verify] = await db.promise().query(
+      `SELECT id, status FROM rfqs WHERE id = ? AND user_id = ?`,
+      [id, userId]
+    );
+
+    console.log(`📋 CANCEL VERIFY - RFQ Status in DB: "${verify[0]?.status}" (type: ${typeof verify[0]?.status})`);
+
     res.json({
       success: true,
       message: "RFQ cancelled successfully",
+      data: {
+        id,
+        status: verify[0]?.status ?? 'CANCELLED'
+      }
     });
   } catch (error) {
     console.error("CANCEL RFQ ERROR:", error);
