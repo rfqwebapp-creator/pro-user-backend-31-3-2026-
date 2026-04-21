@@ -74,11 +74,7 @@ app.head("/api", (req, res) => {
 });
 
 // Temporary user middleware
-app.use((req, res, next) => {
-  req.user = { id: 1 };
-  next();
-});
-
+ 
 // Routes
 const companyRoutes = require("./routes/companyRoutes");
 const subscriptionRoutes = require("./routes/subscriptionRoutes");
