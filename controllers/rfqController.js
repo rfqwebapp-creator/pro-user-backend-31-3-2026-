@@ -160,14 +160,14 @@ exports.getRFQs = async (req, res) => {
 
     let sql = `
       SELECT 
-        id, 
-        heading, 
-        requisition_type, 
-        purpose, 
-        COALESCE(NULLIF(TRIM(status), ''), NULL) AS status,
-        created_at
-      FROM rfqs 
-      WHERE user_id = ?
+  id, 
+  heading, 
+  requisition_type, 
+  purpose, 
+  UPPER(TRIM(status)) AS status,
+  created_at
+FROM rfqs 
+WHERE user_id = ?
     `;
     let params = [userId];
 
