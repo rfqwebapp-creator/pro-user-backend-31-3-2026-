@@ -158,23 +158,29 @@ exports.getRFQs = async (req, res) => {
     const userId = req.user.id; 
     const { status } = req.query;
 
+    // Get unique status values for debugging
+    const [uniqueStatuses] = await db.promise().query(
+      `SELECT DISTINCT status FROM rfqs LIMIT 20`
+    );
+    console.log(`📋 UNIQUE STATUS VALUES IN DB:`, uniqueStatuses.map(r => `"${r.status}"`));
+
     let sql = `
       SELECT 
-  id, 
-  heading, 
-  requisition_type, 
-  purpose, 
-  UPPER(TRIM(status)) AS status,
-  created_at
-FROM rfqs 
-WHERE user_id = ?
+        id, 
+        heading, 
+        requisition_type, 
+        purpose, 
+        status,
+        created_at
+      FROM rfqs 
+      WHERE user_id = ?
     `;
     let params = [userId];
 
     if (status && status !== "ALL") {
-  sql += ` AND UPPER(TRIM(status)) = ?`;
-  params.push(status.toUpperCase());
-}
+      sql += ` AND UPPER(TRIM(COALESCE(status, ''))) = ?`;
+      params.push(status.toUpperCase());
+    }
 
     sql += ` ORDER BY id DESC`;
 
@@ -185,12 +191,36 @@ WHERE user_id = ?
 
     console.log("📋 GETRFQS RESULT COUNT:", rows.length);
     rows.forEach((row, i) => {
-      console.log(`📋 Row ${i}: id=${row.id}, status="${row.status}" (type: ${typeof row.status})`);
+      console.log(`📋 Row ${i}: id=${row.id}, raw_status="${row.status}" (type: ${typeof row.status}, length: ${row.status?.length ?? 0})`);
+    });
+    
+    // Process rows to normalize status values
+    const processedRows = rows.map(row => {
+      let normalizedStatus = null;
+      
+      if (row.status) {
+        const trimmed = String(row.status).trim();
+        if (trimmed) {
+          normalizedStatus = trimmed.toUpperCase();
+        }
+      }
+      
+      console.log(`📋 PROCESSING: id=${row.id}, raw="${row.status}" → normalized="${normalizedStatus}"`);
+      
+      return {
+        ...row,
+        status: normalizedStatus
+      };
+    });
+    
+    console.log("📋 PROCESSED ROWS (after normalization):");
+    processedRows.forEach((row, i) => {
+      console.log(`📋 Row ${i}: id=${row.id}, normalized_status="${row.status}" (type: ${typeof row.status})`);
     });
 
     res.json({
       success: true,
-      data: rows,
+      data: processedRows,
     });
   } catch (error) {
     console.error("GET RFQS ERROR:", error);
@@ -454,41 +484,95 @@ exports.cancelRFQ = async (req, res) => {
 
     console.log(`📋 CANCEL RFQ ID: ${id}, USER ID: ${userId}`);
 
+    // STEP 1: Fetch current status BEFORE update
+    const [beforeUpdate] = await db.promise().query(
+      `SELECT id, status, user_id FROM rfqs WHERE id = ?`,
+      [id]
+    );
+    
+    console.log(`📋 BEFORE UPDATE - RFQ ID ${id}: status="${beforeUpdate[0]?.status}", user_id=${beforeUpdate[0]?.user_id}`);
+
+    // STEP 2: Execute UPDATE with explicit CANCELLED value
     const [result] = await db.promise().query(
-      `UPDATE rfqs SET status = 'CANCELLED' WHERE id = ? AND user_id = ?`,
-      [id, userId]
+      `UPDATE rfqs SET status = ? WHERE id = ? AND user_id = ?`,
+      ['CANCELLED', id, userId]
     );
 
     console.log(`📋 CANCEL UPDATE AFFECTED ROWS: ${result.affectedRows}`);
+    console.log(`📋 UPDATE RESULT - changed_rows: ${result.changedRows}, affected_rows: ${result.affectedRows}`);
 
     if (result.affectedRows === 0) {
+      console.log(`❌ NO ROWS UPDATED! Checking why...`);
+      console.log(`   - ID: ${id}`);
+      console.log(`   - USER_ID: ${userId}`);
+      console.log(`   - Actual user_id in DB: ${beforeUpdate[0]?.user_id}`);
+      
       return res.status(404).json({
         success: false,
-        message: "RFQ not found",
+        message: "RFQ not found or user mismatch",
+        debug: {
+          id,
+          userId,
+          actualUserId: beforeUpdate[0]?.user_id,
+        }
       });
     }
 
-    // Verify the update was saved
-    const [verify] = await db.promise().query(
+    // STEP 3: Verify the update - fetch TWICE with different queries
+    const [verify1] = await db.promise().query(
       `SELECT id, status FROM rfqs WHERE id = ? AND user_id = ?`,
       [id, userId]
     );
 
-    console.log(`📋 CANCEL VERIFY - RFQ Status in DB: "${verify[0]?.status}" (type: ${typeof verify[0]?.status})`);
+    console.log(`📋 VERIFY 1 (with user_id WHERE) - RFQ ID ${id}: status="${verify1[0]?.status}"`);
+    
+    // Also try without user_id filter
+    const [verify2] = await db.promise().query(
+      `SELECT id, status FROM rfqs WHERE id = ?`,
+      [id]
+    );
+    
+    console.log(`📋 VERIFY 2 (without user_id WHERE) - RFQ ID ${id}: status="${verify2[0]?.status}"`);
 
+    // STEP 4: Check for triggers - get ALL columns
+    if (!verify1[0]?.status || verify1[0]?.status === '') {
+      console.warn(`⚠️ STATUS IS EMPTY AFTER UPDATE! Possible trigger or constraint.`);
+      const [fullRow] = await db.promise().query(
+        `SELECT * FROM rfqs WHERE id = ? LIMIT 1`,
+        [id]
+      );
+      
+      const columnNames = Object.keys(fullRow[0] || {});
+      console.log(`📋 ALL COLUMNS for RFQ ${id}:`, columnNames);
+      
+      for (const col of columnNames) {
+        console.log(`   ${col}: "${fullRow[0][col]}" (type: ${typeof fullRow[0][col]})`);
+      }
+    }
+
+    const finalStatus = verify1[0]?.status || 'CANCELLED';
+    
     res.json({
       success: true,
       message: "RFQ cancelled successfully",
       data: {
         id,
-        status: verify[0]?.status ?? 'CANCELLED'
+        status: finalStatus
       }
     });
   } catch (error) {
-    console.error("CANCEL RFQ ERROR:", error);
+    console.error("❌ CANCEL RFQ ERROR:", error);
+    console.error("❌ ERROR DETAILS:", {
+      message: error.message,
+      code: error.code,
+      errno: error.errno,
+      sqlState: error.sqlState,
+      sql: error.sql
+    });
     res.status(500).json({
       success: false,
       message: "Failed to cancel RFQ",
+      error: error.message,
     });
   }
 };
