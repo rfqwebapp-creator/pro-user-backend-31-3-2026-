@@ -10,21 +10,22 @@ const {
   getCostCenterSuggestions,
 } = require("../controllers/rfqController");
 const authMiddleware = require("../middleware/authMiddleware");
-const { updateRFQ } = require("../controllers/rfqController");
-const { cancelRFQ } = require("../controllers/rfqController");
+ 
 
 router.post("/create", authMiddleware, createRFQ);
 router.get("/", authMiddleware, getRFQs);
 
-// 🔥 MOVE THIS UP
+// ✅ specific route first
+router.get("/cost-centers/suggestions", authMiddleware, getCostCenterSuggestions);
+
 router.put("/:id/cancel", authMiddleware, (req, res, next) => {
   console.log("✅ CANCEL ROUTE HIT");
   next();
 }, cancelRFQ);
+
 router.get("/:id", authMiddleware, getRFQById);
 router.put("/:id/status", authMiddleware, updateRFQStatus);
 router.put("/:id", authMiddleware, updateRFQ);
-router.get("/cost-centers/suggestions", authMiddleware, getCostCenterSuggestions);
 
 
 module.exports = router;
