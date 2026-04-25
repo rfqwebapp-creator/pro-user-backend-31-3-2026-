@@ -5,6 +5,9 @@ const {
   getRFQs,
   getRFQById,
   updateRFQStatus,
+    updateRFQ,
+  cancelRFQ,
+  getCostCenterSuggestions,
 } = require("../controllers/rfqController");
 const authMiddleware = require("../middleware/authMiddleware");
 const { updateRFQ } = require("../controllers/rfqController");
@@ -21,7 +24,7 @@ router.put("/:id/cancel", authMiddleware, (req, res, next) => {
 router.get("/:id", authMiddleware, getRFQById);
 router.put("/:id/status", authMiddleware, updateRFQStatus);
 router.put("/:id", authMiddleware, updateRFQ);
-
+router.get("/cost-centers/suggestions", authMiddleware, getCostCenterSuggestions);
 
 
 module.exports = router;

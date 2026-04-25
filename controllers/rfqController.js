@@ -31,7 +31,9 @@ exports.createRFQ = async (req, res) => {
       searchSupplierText,
       inviteEmails = [],
       rfxVisibility,
+      costCenters = [],
       status,
+      
     } = req.body;
     const finalStatus = status || "DRAFT";
 
@@ -55,8 +57,10 @@ exports.createRFQ = async (req, res) => {
         supplier_option,
         search_supplier_text,
         rfx_visibility,
+        cost_centers,
         status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       
       [
         userId,
         heading || "",
@@ -76,6 +80,7 @@ exports.createRFQ = async (req, res) => {
         supplierOption || "",
         searchSupplierText || "",
         rfxVisibility || "",
+        JSON.stringify(costCenters || []),
         finalStatus,
       ]
     );
@@ -275,6 +280,9 @@ const [rfqRows] = await db.promise().query(
       success: true,
       data: {
         ...rfqRows[0],
+        costCenters: rfqRows[0].cost_centers
+    ? JSON.parse(rfqRows[0].cost_centers)
+    : [],
         items,
         documents,
        inviteEmails: emails.map((e) => e.email),
@@ -337,6 +345,143 @@ exports.updateRFQStatus = async (req, res) => {
 
 
 // UPDATE RFQ
+// exports.updateRFQ = async (req, res) => {
+//   const conn = await db.promise().getConnection();
+
+//   try {
+//     await conn.beginTransaction();
+
+//     const { id } = req.params;
+//     const userId = req.user.id;
+
+//     const {
+//       heading,
+//       description,
+//       procurementType,
+//       requisitionType,
+//       bidType,
+//       purpose,
+//       evaluationMethod,
+//       classification,
+//       publishDate,
+//       closingDate,
+//       selectedIndustry,
+//       selectedSubItems = [],
+//       items = [],
+//       itemDescriptionNote,
+//       documents = [],
+//       deliveryTime,
+//       paymentTerms,
+//       supplierOption,
+//       searchSupplierText,
+//       inviteEmails = [],
+//       rfxVisibility,
+//     } = req.body;
+
+//     // 🔹 Update main RFQ
+//     await conn.query(
+//       `UPDATE rfqs SET
+//         heading = ?,
+//         description = ?,
+//         procurement_type = ?,
+//         requisition_type = ?,
+//         bid_type = ?,
+//         purpose = ?,
+//         evaluation_method = ?,
+//         classification = ?,
+//         publish_date = ?,
+//         closing_date = ?,
+//         selected_industry = ?,
+//         item_description_note = ?,
+//         delivery_time = ?,
+//         payment_terms = ?,
+//         supplier_option = ?,
+//         search_supplier_text = ?,
+//         rfx_visibility = ?
+//       WHERE id = ? AND user_id = ?`,
+//       [
+//         heading,
+//         description,
+//         procurementType,
+//         requisitionType,
+//         bidType,
+//         purpose,
+//         evaluationMethod,
+//         classification,
+//         publishDate,
+//         closingDate,
+//         selectedIndustry,
+//         itemDescriptionNote,
+//         deliveryTime,
+//         paymentTerms,
+//         supplierOption,
+//         searchSupplierText,
+//         rfxVisibility,
+//         id,
+//         userId,
+//       ]
+//     );
+
+//     // 🔥 OLD DATA DELETE (IMPORTANT)
+//     await conn.query(`DELETE FROM rfq_items WHERE rfq_id = ?`, [id]);
+//     await conn.query(`DELETE FROM rfq_documents WHERE rfq_id = ?`, [id]);
+//     await conn.query(`DELETE FROM rfq_invite_emails WHERE rfq_id = ?`, [id]);
+//     await conn.query(`DELETE FROM rfq_sub_items WHERE rfq_id = ?`, [id]);
+
+//     // 🔹 INSERT UPDATED ITEMS
+//     for (const item of items) {
+//       await conn.query(
+//         `INSERT INTO rfq_items (rfq_id, sl_no, item_description, quantity, unit)
+//          VALUES (?, ?, ?, ?, ?)`,
+//         [id, item.slNo, item.itemDescription, item.quantity, item.unit]
+//       );
+//     }
+
+//     // 🔹 DOCUMENTS
+//     for (const doc of documents) {
+//       await conn.query(
+//         `INSERT INTO rfq_documents (rfq_id, name, url)
+//          VALUES (?, ?, ?)`,
+//         [id, doc.name, doc.url]
+//       );
+//     }
+
+//     // 🔹 EMAILS
+//     for (const email of inviteEmails) {
+//       await conn.query(
+//         `INSERT INTO rfq_invite_emails (rfq_id, email)
+//          VALUES (?, ?)`,
+//         [id, email]
+//       );
+//     }
+
+//     // 🔹 SUB ITEMS
+//     for (const sub of selectedSubItems) {
+//       await conn.query(
+//         `INSERT INTO rfq_sub_items (rfq_id, sub_item)
+//          VALUES (?, ?)`,
+//         [id, sub]
+//       );
+//     }
+
+//     await conn.commit();
+
+//     res.json({
+//       success: true,
+//       message: "RFQ updated successfully",
+//     });
+//   } catch (error) {
+//     await conn.rollback();
+//     console.error("UPDATE RFQ ERROR:", error);
+//     res.status(500).json({
+//       success: false,
+//       message: "Failed to update RFQ",
+//     });
+//   } finally {
+//     conn.release();
+//   }
+// };
+// UPDATE RFQ (WITH STATUS SUPPORT)
 exports.updateRFQ = async (req, res) => {
   const conn = await db.promise().getConnection();
 
@@ -368,9 +513,11 @@ exports.updateRFQ = async (req, res) => {
       searchSupplierText,
       inviteEmails = [],
       rfxVisibility,
+      costCenters = [],
+      status, // ✅ ADDED
     } = req.body;
 
-    // 🔹 Update main RFQ
+    // 🔹 Update main RFQ (NOW INCLUDING STATUS)
     await conn.query(
       `UPDATE rfqs SET
         heading = ?,
@@ -389,32 +536,36 @@ exports.updateRFQ = async (req, res) => {
         payment_terms = ?,
         supplier_option = ?,
         search_supplier_text = ?,
-        rfx_visibility = ?
+        rfx_visibility = ?,
+        cost_centers = ?,
+        status = ?   -- ✅ ADDED
       WHERE id = ? AND user_id = ?`,
       [
-        heading,
-        description,
-        procurementType,
-        requisitionType,
-        bidType,
-        purpose,
-        evaluationMethod,
-        classification,
-        publishDate,
-        closingDate,
-        selectedIndustry,
-        itemDescriptionNote,
-        deliveryTime,
-        paymentTerms,
-        supplierOption,
-        searchSupplierText,
-        rfxVisibility,
+        heading || "",
+        description || "",
+        procurementType || "",
+        requisitionType || "",
+        bidType || "",
+        purpose || "",
+        evaluationMethod || "",
+        classification || "",
+        publishDate || null,
+        closingDate || null,
+        selectedIndustry || "",
+        itemDescriptionNote || "",
+        deliveryTime || "",
+        paymentTerms || "",
+        supplierOption || "",
+        searchSupplierText || "",
+        rfxVisibility || "",
+        JSON.stringify(costCenters || []),
+        status || "DRAFT", // ✅ DEFAULT
         id,
         userId,
       ]
     );
 
-    // 🔥 OLD DATA DELETE (IMPORTANT)
+    // 🔥 DELETE OLD RELATED DATA
     await conn.query(`DELETE FROM rfq_items WHERE rfq_id = ?`, [id]);
     await conn.query(`DELETE FROM rfq_documents WHERE rfq_id = ?`, [id]);
     await conn.query(`DELETE FROM rfq_invite_emails WHERE rfq_id = ?`, [id]);
@@ -425,29 +576,41 @@ exports.updateRFQ = async (req, res) => {
       await conn.query(
         `INSERT INTO rfq_items (rfq_id, sl_no, item_description, quantity, unit)
          VALUES (?, ?, ?, ?, ?)`,
-        [id, item.slNo, item.itemDescription, item.quantity, item.unit]
+        [
+          id,
+          item.slNo || null,
+          item.itemDescription || "",
+          item.quantity || "",
+          item.unit || "",
+        ]
       );
     }
 
-    // 🔹 DOCUMENTS
+    // 🔹 INSERT DOCUMENTS
     for (const doc of documents) {
       await conn.query(
         `INSERT INTO rfq_documents (rfq_id, name, url)
          VALUES (?, ?, ?)`,
-        [id, doc.name, doc.url]
+        [
+          id,
+          doc.name || "",
+          doc.url || "",
+        ]
       );
     }
 
-    // 🔹 EMAILS
+    // 🔹 INSERT EMAILS
     for (const email of inviteEmails) {
-      await conn.query(
-        `INSERT INTO rfq_invite_emails (rfq_id, email)
-         VALUES (?, ?)`,
-        [id, email]
-      );
+      if (email && email.trim()) {
+        await conn.query(
+          `INSERT INTO rfq_invite_emails (rfq_id, email)
+           VALUES (?, ?)`,
+          [id, email]
+        );
+      }
     }
 
-    // 🔹 SUB ITEMS
+    // 🔹 INSERT SUB ITEMS
     for (const sub of selectedSubItems) {
       await conn.query(
         `INSERT INTO rfq_sub_items (rfq_id, sub_item)
@@ -465,15 +628,16 @@ exports.updateRFQ = async (req, res) => {
   } catch (error) {
     await conn.rollback();
     console.error("UPDATE RFQ ERROR:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to update RFQ",
+      error: error.message,
     });
   } finally {
     conn.release();
   }
 };
-
 
 // CANCEL RFQ
 exports.cancelRFQ = async (req, res) => {
@@ -573,6 +737,41 @@ exports.cancelRFQ = async (req, res) => {
       success: false,
       message: "Failed to cancel RFQ",
       error: error.message,
+    });
+  }
+};
+
+exports.getCostCenterSuggestions = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.promise().query(
+      `SELECT cost_centers FROM rfqs 
+       WHERE user_id = ? AND cost_centers IS NOT NULL`,
+      [userId]
+    );
+
+    const suggestions = [
+      ...new Set(
+        rows.flatMap((row) => {
+          try {
+            return JSON.parse(row.cost_centers || "[]");
+          } catch {
+            return [];
+          }
+        })
+      ),
+    ];
+
+    res.json({
+      success: true,
+      data: suggestions,
+    });
+  } catch (error) {
+    console.error("COST CENTER SUGGESTION ERROR:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch cost centers",
     });
   }
 };
