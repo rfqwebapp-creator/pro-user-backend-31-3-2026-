@@ -1,6 +1,8 @@
 const db = require("../config/db");
 
 exports.createRole = (req, res) => {
+  console.log("ROLE BODY:", req.body);
+
   const { name, description, permissions, fieldPermissions } = req.body;
 
   if (!name) {
