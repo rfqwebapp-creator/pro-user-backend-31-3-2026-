@@ -4,6 +4,9 @@ console.log("✅ ROLE CONTROLLER LATEST FILE LOADED");
 
 
 exports.createRole = (req, res) => {
+  console.log("🔥 ROLE BODY:", req.body);
+console.log("🔥 EMAIL:", req.body.email);
+console.log("🔥 PASSWORD:", req.body.password);
   const { name, description, email, password, permissions, fieldPermissions } = req.body;
 
   const sql = `INSERT INTO roles (name, description, permissions, field_permissions)
