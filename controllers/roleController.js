@@ -1,18 +1,13 @@
 const db = require("../config/db");
+const nodemailer = require("nodemailer");
 console.log("✅ ROLE CONTROLLER LATEST FILE LOADED");
+
+
 exports.createRole = (req, res) => {
-  console.log("ROLE BODY:", req.body);
+  const { name, description, email, password, permissions, fieldPermissions } = req.body;
 
-  const { name, description, permissions, fieldPermissions } = req.body;
-
-  if (!name) {
-    return res.status(400).json({ message: "Role name is required" });
-  }
-
-  const sql = `
-    INSERT INTO roles (name, description, permissions, field_permissions)
-    VALUES (?, ?, ?, ?)
-  `;
+  const sql = `INSERT INTO roles (name, description, permissions, field_permissions)
+               VALUES (?, ?, ?, ?)`;
 
   db.query(
     sql,
@@ -22,16 +17,23 @@ exports.createRole = (req, res) => {
       JSON.stringify(permissions || []),
       JSON.stringify(fieldPermissions || [])
     ],
-    (err, result) => {
+    async (err, result) => {
       if (err) {
-        console.error("CREATE ROLE ERROR:", err);
         return res.status(500).json({ message: "Error creating role" });
+      }
+
+      // 🔥 EMAIL SEND
+      if (email && password) {
+        await sendRoleEmail({
+          email,
+          password,
+          roleName: name,
+        });
       }
 
       res.json({
         success: true,
-        message: "Role saved successfully ✅",
-        roleId: result.insertId
+        message: "Role created & email sent ✅",
       });
     }
   );
@@ -80,5 +82,39 @@ exports.deleteRole = (req, res) => {
       success: true,
       message: "Role deleted successfully"
     });
+  });
+};
+const sendRoleEmail = async ({ email, password, roleName }) => {
+  const transporter = nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: process.env.MAIL_USER,
+      pass: process.env.MAIL_PASS,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Procubid" <${process.env.MAIL_USER}>`,
+    to: email,
+    subject: "Your Procubid Login Details",
+    html: `
+      <p>Hello,</p>
+
+      <p>You have been added to Procubid with the role: <b>${roleName}</b>.</p>
+
+      <p>Please use the below login details:</p>
+
+      <p>
+        <b>Email:</b> ${email}<br/>
+        <b>Password:</b> ${password}
+      </p>
+
+      <p>Login here:</p>
+      <p>https://www.procubid.com/login</p>
+
+      <p>After login, please change your password for security.</p>
+
+      <p>Regards,<br/>Procubid Team</p>
+    `,
   });
 };
