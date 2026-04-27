@@ -292,6 +292,8 @@ module.exports = (db) => {
             email: user.email,
             firstName: user.firstName,
             lastName: user.lastName,
+              gst: user.gst   // ✅ ADD THIS
+
           },
         });
       } catch (error) {
@@ -303,3 +305,21 @@ module.exports = (db) => {
 
   return router;
 };
+
+
+// routes/userRoutes.js or authRoutes.js
+
+router.get("/users/by-gst/:gst", (req, res) => {
+  const { gst } = req.params;
+
+  const sql = "SELECT * FROM RegCustomers WHERE gst = ?";
+
+  db.query(sql, [gst], (err, result) => {
+    if (err) {
+      console.error(err);
+      return res.status(500).json({ message: "DB Error" });
+    }
+
+    res.json(result);
+  });
+});
