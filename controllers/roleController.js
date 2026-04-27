@@ -1,5 +1,4 @@
 const db = require("../config/db");
-
 exports.createRole = (req, res) => {
   console.log("ROLE BODY:", req.body);
 
