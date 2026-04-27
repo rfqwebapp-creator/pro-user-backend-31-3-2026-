@@ -1,4 +1,5 @@
 const db = require("../config/db");
+console.log("✅ ROLE CONTROLLER LATEST FILE LOADED");
 exports.createRole = (req, res) => {
   console.log("ROLE BODY:", req.body);
 
