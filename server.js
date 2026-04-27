@@ -5,7 +5,7 @@ const cors = require("cors");
 const db = require("./config/db");
 const path = require("path");
 const app = express();
-
+app.use(express.json());
 const allowedOrigins = [
   "https://www.procubid.com",
   "https://procubid.com",
