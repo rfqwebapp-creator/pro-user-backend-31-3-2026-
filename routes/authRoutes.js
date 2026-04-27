@@ -303,9 +303,7 @@ module.exports = (db) => {
     });
   });
 
-  return router;
-};
-
+  
 
 // routes/userRoutes.js or authRoutes.js
 
@@ -323,3 +321,5 @@ router.get("/users/by-gst/:gst", (req, res) => {
     res.json(result);
   });
 });
+return router;
+};
