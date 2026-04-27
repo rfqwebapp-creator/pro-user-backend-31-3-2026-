@@ -24,11 +24,17 @@ exports.createRole = (req, res) => {
 
       // 🔥 EMAIL SEND
       if (email && password) {
-        await sendRoleEmail({
-          email,
-          password,
-          roleName: name,
-        });
+        console.log("📧 Sending email to:", email);
+        try {
+  await sendRoleEmail({
+    email,
+    password,
+    roleName: name,
+  });
+  console.log("✅ Email sent");
+} catch (err) {
+  console.error("❌ Email error:", err);
+}
       }
 
       res.json({
