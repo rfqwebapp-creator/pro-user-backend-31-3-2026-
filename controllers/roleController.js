@@ -34,3 +34,49 @@ exports.createRole = (req, res) => {
     }
   );
 };
+exports.getAllRoles = (req, res) => {
+  db.query("SELECT * FROM roles ORDER BY id DESC", (err, rows) => {
+    if (err) {
+      console.error("GET ROLES ERROR:", err);
+      return res.status(500).json({ message: "Error fetching roles" });
+    }
+    res.json(rows);
+  });
+};
+
+exports.getRoleById = (req, res) => {
+  const { id } = req.params;
+
+  db.query("SELECT * FROM roles WHERE id = ?", [id], (err, rows) => {
+    if (err) {
+      console.error("GET ROLE ERROR:", err);
+      return res.status(500).json({ message: "Error fetching role" });
+    }
+
+    if (rows.length === 0) {
+      return res.status(404).json({ message: "Role not found" });
+    }
+
+    res.json(rows[0]);
+  });
+};
+
+exports.deleteRole = (req, res) => {
+  const { id } = req.params;
+
+  db.query("DELETE FROM roles WHERE id = ?", [id], (err, result) => {
+    if (err) {
+      console.error("DELETE ROLE ERROR:", err);
+      return res.status(500).json({ message: "Error deleting role" });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Role not found" });
+    }
+
+    res.json({
+      success: true,
+      message: "Role deleted successfully"
+    });
+  });
+};
