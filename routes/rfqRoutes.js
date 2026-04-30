@@ -8,11 +8,19 @@ const {
     updateRFQ,
   cancelRFQ,
   getCostCenterSuggestions,
+  getUserCostCenters,
+addUserCostCenter,
+updateUserCostCenter,
+deleteUserCostCenter,
 } = require("../controllers/rfqController");
 const authMiddleware = require("../middleware/authMiddleware");
  
 
 router.post("/create", authMiddleware, createRFQ);
+router.get("/cost-centers/list", authMiddleware, getUserCostCenters);
+router.post("/cost-centers/add", authMiddleware, addUserCostCenter);
+router.put("/cost-centers/update", authMiddleware, updateUserCostCenter);
+router.delete("/cost-centers/delete", authMiddleware, deleteUserCostCenter);
 router.get("/", authMiddleware, getRFQs);
 
 // ✅ specific route first

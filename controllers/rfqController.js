@@ -775,3 +775,132 @@ exports.getCostCenterSuggestions = async (req, res) => {
     });
   }
 };
+
+
+
+
+
+
+// GET ALL COST CENTERS FROM LOGGED-IN USER RFQS
+exports.getUserCostCenters = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const [rows] = await db.promise().query(
+      `SELECT cost_centers FROM rfqs
+       WHERE user_id = ? AND cost_centers IS NOT NULL`,
+      [userId]
+    );
+
+    const costCenters = [
+      ...new Set(
+        rows.flatMap((row) => {
+          try {
+            return JSON.parse(row.cost_centers || "[]");
+          } catch {
+            return [];
+          }
+        }).filter(Boolean)
+      ),
+    ];
+
+    res.json({ success: true, data: costCenters });
+  } catch (error) {
+    console.error("GET COST CENTERS ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to fetch cost centers" });
+  }
+};
+
+// ADD NEW COST CENTER
+exports.addUserCostCenter = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: "Cost center name required" });
+    }
+
+    // create one draft-like RFQ only to store standalone cost center
+    await db.promise().query(
+      `INSERT INTO rfqs (user_id, heading, cost_centers, status)
+       VALUES (?, ?, ?, ?)`,
+      [userId, "Cost Center Entry", JSON.stringify([name.trim()]), "DRAFT"]
+    );
+
+    res.json({ success: true, message: "Cost center added successfully" });
+  } catch (error) {
+    console.error("ADD COST CENTER ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to add cost center" });
+  }
+};
+
+// EDIT COST CENTER IN ALL USER RFQS
+exports.updateUserCostCenter = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { oldName, newName } = req.body;
+
+    const [rows] = await db.promise().query(
+      `SELECT id, cost_centers FROM rfqs
+       WHERE user_id = ? AND cost_centers IS NOT NULL`,
+      [userId]
+    );
+
+    for (const row of rows) {
+      let arr = [];
+      try {
+        arr = JSON.parse(row.cost_centers || "[]");
+      } catch {}
+
+      if (arr.includes(oldName)) {
+        arr = arr.map((cc) => cc === oldName ? newName.trim() : cc);
+
+        await db.promise().query(
+          `UPDATE rfqs SET cost_centers = ? WHERE id = ? AND user_id = ?`,
+          [JSON.stringify([...new Set(arr)]), row.id, userId]
+        );
+      }
+    }
+
+    res.json({ success: true, message: "Cost center updated successfully" });
+  } catch (error) {
+    console.error("UPDATE COST CENTER ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to update cost center" });
+  }
+};
+
+// DELETE COST CENTER FROM ALL USER RFQS
+exports.deleteUserCostCenter = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { name } = req.body;
+
+    const [rows] = await db.promise().query(
+      `SELECT id, cost_centers FROM rfqs
+       WHERE user_id = ? AND cost_centers IS NOT NULL`,
+      [userId]
+    );
+
+    for (const row of rows) {
+      let arr = [];
+      try {
+        arr = JSON.parse(row.cost_centers || "[]");
+      } catch {}
+
+      if (arr.includes(name)) {
+        arr = arr.filter((cc) => cc !== name);
+
+        await db.promise().query(
+          `UPDATE rfqs SET cost_centers = ? WHERE id = ? AND user_id = ?`,
+          [JSON.stringify(arr), row.id, userId]
+        );
+      }
+    }
+
+    res.json({ success: true, message: "Cost center deleted successfully" });
+  } catch (error) {
+    console.error("DELETE COST CENTER ERROR:", error);
+    res.status(500).json({ success: false, message: "Failed to delete cost center" });
+  }
+};
